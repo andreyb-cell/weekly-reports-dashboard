@@ -1,0 +1,110 @@
+
+Контрольная дата
+Пополнения агенств
+Пополнения без Ecom
+Blue glou FB
+Blue glou SWP
+Blue glou TOV
+SBC
+Aleph group
+Potato
+Rezono
+BigoDirect
+MediaGo Direct
+Taboola Direct
+OutBrain Direct
+p2w
+SN direct
+NB Direct
+Gigo
+Google?
+Итого на агенствах
+Итого на агенствах без Ecom
+Итого Blue glou FB
+Blue glou SWP
+Blue glou Ins Stas
+Blue glou TOV
+Итого Aleph group FB
+Итого SBC
+Potato
+Rezono
+BigoDirect
+MediaGo Direct
+Taboola Direct
+OutBrain Direct
+p2w
+SN direct
+NB Direct
+У Агенств не распределенный
+Не распределенный без Ecom
+Blue glou FB
+Blue glou SWP
+Blue glou Ins Stas
+Blue glou TOV
+Итого Aleph group FB
+Итого SBC
+Potato
+Rezono
+BigoDirect
+MediaGo Direct
+Taboola Direct
+OutBrain Direct
+p2w
+SN direct
+NB Direct
+Баланс на акках агенства
+Баланс на акках без Ecom
+Итого Blue glou FB
+Blue glou SWP
+Blue glou Ins Stas
+Blue glou TOV
+Итого Aleph group FB Ecom
+Итого Aleph group FB
+Итого SBC
+Potato FB
+Rezono
+BigoDirect
+MediaGo Direct
+Taboola Direct
+OutBrain Direct
+p2w FB
+SN direct
+NB Direct
+Спенд по агенствам
+Спенд без урахування Ecom
+Potato ТТ
+Rezono TT
+Rezono FB
+Blue glou FB
+Blue glou SWP
+Blue glou Ins Stas
+Blue glou TOV
+Aleph group FB Ecom
+Aleph group FB
+SBC FB
+p2w FB
+p2w NB
+p2w SN
+p2w Ecom
+BigoDirect
+NB Direct
+MediaGo Direct
+Taboola Direct
+OutBrain Direct
+SN direct
+Проверка
+Blue glou FB
+Blue glou SWP
+Blue glou TOV
+Aleph group
+SBC
+Potato
+Rezono
+BigoDirect
+MediaGo Direct
+Taboola Direct
+OutBrain Direct
+p2w
+SN direct
+NB Direct
+Итого:
