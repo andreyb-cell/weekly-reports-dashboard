@@ -6,12 +6,27 @@ let appData = {
   dates: [],
   source1Metrics: [],
   source2Metrics: [],
+  source2RevMetrics: [],
+  source2WithMetrics: [],
   customMetrics: []
 };
 let charts = {};
 
 // Summary metrics we want to show on Main Tab
-const SUMMARY_METRICS = [
+const MAIN_DASHBOARD_METRICS = [
+  "Пополнения агенств",
+  "Пополнения без Ecom",
+  "Спенд по агенствам",
+  "Спенд без урахування Ecom",
+  "Итого на агенствах",
+  "Итого на агенствах без Ecom",
+  "Рекли Баланс",
+  "Рекли Ревеню",
+  "Рекли Вивід"
+];
+
+// Used for filtering out of Cost/Revenue specific tabs
+const ALL_SUMMARY_NAMES = [
   "Пополнения агенств",
   "Пополнения без Ecom",
   "Спенд по агенствам",
@@ -19,7 +34,10 @@ const SUMMARY_METRICS = [
   "Итого на агенствах",
   "Итого на агенствах без Ecom",
   "Баланс на акках агенства",
-  "Баланс на акках без Ecom"
+  "Баланс на акках без Ecom",
+  "Рекли Баланс",
+  "Рекли Ревеню",
+  "Рекли Вивід"
 ];
 
 function formatNumber(num) {
@@ -46,7 +64,7 @@ async function fetchData() {
     const result = await response.json();
     if (result.status === "error") throw new Error(result.message);
     
-    processData(result.source1, result.source2);
+    processData(result);
   } catch (err) {
     console.error("Fetch error", err);
     alert("Помилка завантаження даних");
@@ -54,7 +72,12 @@ async function fetchData() {
 }
 
 // 2. Process Raw Data
-function processData(rows1, rows2) {
+function processData(result) {
+  const rows1 = result.source1 || [];
+  const rows2 = result.source2 || [];
+  const rows2_rev = result.source2_revenue || [];
+  const rows2_with = result.source2_withdrawal || [];
+
   // Extract dates from source1 (Row 1 usually contains 'Контрольная дата')
   let dateRowIndex = 0;
   for (let i = 0; i < Math.min(5, rows1.length); i++) {
@@ -65,7 +88,7 @@ function processData(rows1, rows2) {
   }
   if (dateRowIndex === 0 && rows1.length > 1) dateRowIndex = 1;
 
-  const dateRow = rows1[dateRowIndex];
+  const dateRow = rows1[dateRowIndex] || [];
   const allDates = [];
   const dateIndices = [];
 
@@ -79,15 +102,17 @@ function processData(rows1, rows2) {
 
   appData.dates = allDates;
 
-  // Parse Source 1
+  // Parse All Sources
   appData.source1Metrics = parseRows(rows1, dateIndices);
-  // Parse Source 2
   appData.source2Metrics = parseRows(rows2, dateIndices);
+  appData.source2RevMetrics = parseRows(rows2_rev, dateIndices);
+  appData.source2WithMetrics = parseRows(rows2_with, dateIndices);
 
   calculateCustomMetrics();
 }
 
 function parseRows(rows, dateIndices) {
+  if (!rows || rows.length === 0) return [];
   const metrics = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
@@ -110,20 +135,37 @@ function parseRows(rows, dateIndices) {
   return metrics;
 }
 
+// Helper to extract a single metric from multiple sources
+const getVals = (name) => {
+  let m = appData.source1Metrics.find(x => x.name === name);
+  if (m) return m.values;
+  m = appData.source2Metrics.find(x => x.name === name);
+  if (m) return m.values;
+  m = appData.source2RevMetrics.find(x => x.name === name);
+  if (m) return m.values;
+  m = appData.source2WithMetrics.find(x => x.name === name);
+  if (m) return m.values;
+  return new Array(appData.dates.length).fill(0);
+};
+
+const getMetric = (name) => {
+  let m = appData.source1Metrics.find(x => x.name === name);
+  if (m) return m;
+  m = appData.source2Metrics.find(x => x.name === name);
+  if (m) return m;
+  m = appData.source2RevMetrics.find(x => x.name === name);
+  if (m) return m;
+  m = appData.source2WithMetrics.find(x => x.name === name);
+  return m;
+};
+
 // 3. Calculate Custom Metrics
 function calculateCustomMetrics() {
-  const s1 = appData.source1Metrics;
-  const s2 = appData.source2Metrics;
   const datesLen = appData.dates.length;
 
-  const getVals = (src, name) => {
-    const m = src.find(x => x.name === name);
-    return m ? m.values : new Array(datesLen).fill(0);
-  };
-
-  const revAdvertisers = getVals(s2, "Рекли Баланс");
-  const spendNoEcom = getVals(s1, "Спенд без урахування Ecom");
-  const balanceAccount = getVals(s1, "Баланс на акках агенства");
+  const revAdvertisers = getVals("Рекли Баланс");
+  const spendNoEcom = getVals("Спенд без урахування Ecom");
+  const totalAgencies = getVals("Итого на агенствах"); // Changed from Баланс на акках агенства
 
   const margin = [];
   const frozen = [];
@@ -131,12 +173,12 @@ function calculateCustomMetrics() {
   for (let i = 0; i < datesLen; i++) {
     const r = revAdvertisers[i] || 0;
     const s = spendNoEcom[i] || 0;
-    const b = balanceAccount[i] || 0;
+    const t = totalAgencies[i] || 0;
 
-    // Маржа без товарки итого = revenue рекламодавців - spend без е-ком
+    // Маржа без товарки итого = Рекли Баланс - Спенд без урахування Ecom
     margin.push(r - s);
-    // Заморожені гроші без товарки = Баланс на партнерах (Рекли Баланс) + баланс на аккаунт
-    frozen.push(r + b);
+    // Заморожені гроші без товарки = Рекли Баланс + Итого на агенствах
+    frozen.push(r + t);
   }
 
   appData.customMetrics = [
@@ -153,14 +195,14 @@ function renderMainTab() {
   // Table
   const tableData = [];
   
-  // Add hardcoded Summary Metrics from Source 1
-  SUMMARY_METRICS.forEach(name => {
-    const m = appData.source1Metrics.find(x => x.name === name);
+  // Add required metrics in explicit order
+  MAIN_DASHBOARD_METRICS.forEach(name => {
+    const m = getMetric(name);
     if (m) {
       tableData.push({
         name: m.name,
         values: m.values.slice(-numWeeks),
-        highlight: m.name.toLowerCase().includes('итого') || m.name.toLowerCase().includes('баланс')
+        highlight: m.name.toLowerCase().includes('итого') || m.name.toLowerCase().includes('баланс') || m.name.toLowerCase().includes('вивід') || m.name.toLowerCase().includes('ревеню')
       });
     }
   });
@@ -181,18 +223,18 @@ function renderMainTab() {
 }
 
 function renderMainCharts(dates) {
-  const sliceVals = (src, name) => {
-    const m = src.find(x => x.name === name);
+  const sliceVals = (name) => {
+    const m = getMetric(name);
     return m ? m.values.slice(-dates.length) : new Array(dates.length).fill(0);
   };
 
   const frozen = appData.customMetrics.find(m => m.name === "Заморожені гроші без товарки").values.slice(-dates.length);
-  const balPartners = sliceVals(appData.source2Metrics, "Рекли Баланс");
-  const balAccounts = sliceVals(appData.source1Metrics, "Баланс на акках агенства");
+  const balPartners = sliceVals("Рекли Баланс");
+  const totalAgencies = sliceVals("Итого на агенствах"); // New requirement
 
   const margin = appData.customMetrics.find(m => m.name === "Маржа без товарки итого").values.slice(-dates.length);
-  const spendNoEcom = sliceVals(appData.source1Metrics, "Спенд без урахування Ecom");
-  const revAdvertisers = sliceVals(appData.source2Metrics, "Рекли Баланс");
+  const spendNoEcom = sliceVals("Спенд без урахування Ecom");
+  const revAdvertisers = sliceVals("Рекли Баланс");
 
   const commonOptions = {
     responsive: true,
@@ -212,8 +254,8 @@ function renderMainCharts(dates) {
       labels: dates,
       datasets: [
         { label: 'Заморожені гроші', data: frozen, backgroundColor: '#8b5cf6' },
-        { label: 'Баланс на партнерах', data: balPartners, backgroundColor: '#3b82f6' },
-        { label: 'Баланс на аккаунтах', data: balAccounts, backgroundColor: '#10b981' }
+        { label: 'Рекли Баланс', data: balPartners, backgroundColor: '#3b82f6' },
+        { label: 'Итого на агенствах', data: totalAgencies, backgroundColor: '#10b981' }
       ]
     },
     options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'Графік 1: Заморожені гроші', color: '#f8fafc' } } }
@@ -228,7 +270,7 @@ function renderMainCharts(dates) {
       datasets: [
         { label: 'Маржа', data: margin, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.3 },
         { label: 'Спенд без Ecom', data: spendNoEcom, borderColor: '#ef4444', tension: 0.3 },
-        { label: 'Revenue рекламодавців', data: revAdvertisers, borderColor: '#10b981', tension: 0.3 }
+        { label: 'Рекли Баланс', data: revAdvertisers, borderColor: '#10b981', tension: 0.3 }
       ]
     },
     options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'Графік 2: Маржа та Спенд', color: '#f8fafc' } } }
@@ -244,7 +286,7 @@ function renderCostTab() {
   const agencyVal = document.getElementById('cost-agency').value;
   
   // Exclude summary metrics, only show actual agencies
-  let dataToRender = appData.source1Metrics.filter(m => !SUMMARY_METRICS.includes(m.name) && !m.name.includes("Итого"));
+  let dataToRender = appData.source1Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && !m.name.includes("Итого"));
 
   if (agencyVal !== 'all') {
     dataToRender = dataToRender.filter(m => m.name === agencyVal);
@@ -260,7 +302,7 @@ function renderCostTab() {
   // Populate filter dropdown if empty
   const select = document.getElementById('cost-agency');
   if (select.options.length <= 1) {
-    appData.source1Metrics.filter(m => !SUMMARY_METRICS.includes(m.name) && !m.name.includes("Итого")).forEach(m => {
+    appData.source1Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && !m.name.includes("Итого")).forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.name;
       opt.textContent = m.name;
@@ -278,7 +320,7 @@ function renderRevenueTab() {
   const partnerVal = document.getElementById('rev-partner').value;
   
   // Exclude main summary metrics if any
-  let dataToRender = appData.source2Metrics.filter(m => m.name !== "Рекли Баланс" && m.name !== " ");
+  let dataToRender = appData.source2Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && m.name !== " ");
 
   if (partnerVal !== 'all') {
     dataToRender = dataToRender.filter(m => m.name === partnerVal);
@@ -294,7 +336,7 @@ function renderRevenueTab() {
   // Populate filter dropdown if empty
   const select = document.getElementById('rev-partner');
   if (select.options.length <= 1) {
-    appData.source2Metrics.filter(m => m.name !== "Рекли Баланс" && m.name !== " ").forEach(m => {
+    appData.source2Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && m.name !== " ").forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.name;
       opt.textContent = m.name;
