@@ -194,6 +194,7 @@ function calculateCustomMetrics() {
   const datesLen = appData.dates.length;
 
   const revAdvertisers = getVals("Рекли Баланс");
+  const revRevenue = getVals("Рекли Ревеню");
   const spendNoEcom = getVals("Спенд без урахування Ecom");
   const totalAgencies = getVals("Итого на агенствах");
 
@@ -201,14 +202,15 @@ function calculateCustomMetrics() {
   const frozen = [];
 
   for (let i = 0; i < datesLen; i++) {
-    const r = revAdvertisers[i] || 0;
+    const r_bal = revAdvertisers[i] || 0;
+    const r_rev = revRevenue[i] || 0;
     const s = spendNoEcom[i] || 0;
     const t = totalAgencies[i] || 0;
 
-    // Маржа без товарки итого = Рекли Баланс - Спенд без урахування Ecom
-    margin.push(r - s);
+    // Маржа без товарки итого = Рекли Ревеню - Спенд без урахування Ecom
+    margin.push(r_rev - s);
     // Заморожені гроші без товарки = Рекли Баланс + Итого на агенствах
-    frozen.push(r + t);
+    frozen.push(r_bal + t);
   }
 
   appData.customMetrics = [
@@ -264,7 +266,9 @@ function renderMainCharts(dates) {
 
   const margin = appData.customMetrics.find(m => m.name === "Маржа без товарки итого").values.slice(-dates.length);
   const spendNoEcom = sliceVals("Спенд без урахування Ecom");
-  const revAdvertisers = sliceVals("Рекли Баланс");
+  const revAdvertisers = sliceVals("Рекли Баланс"); // This remains on the chart, or do they want 'Рекли Ревеню' on chart 2?
+  // Let's use 'Рекли Ревеню' on chart 2 since margin is calculated using it now
+  const revRevenue = sliceVals("Рекли Ревеню");
 
   const commonOptions = {
     responsive: true,
@@ -279,13 +283,13 @@ function renderMainCharts(dates) {
   if (charts.chart1) charts.chart1.destroy();
   const ctx1 = document.getElementById('chart1').getContext('2d');
   charts.chart1 = new Chart(ctx1, {
-    type: 'bar',
+    type: 'line',
     data: {
       labels: dates,
       datasets: [
-        { label: 'Заморожені гроші', data: frozen, backgroundColor: '#8b5cf6' },
-        { label: 'Рекли Баланс', data: balPartners, backgroundColor: '#3b82f6' },
-        { label: 'Итого на агенствах', data: totalAgencies, backgroundColor: '#10b981' }
+        { label: 'Заморожені гроші', data: frozen, borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.3 },
+        { label: 'Рекли Баланс', data: balPartners, borderColor: '#3b82f6', tension: 0.3 },
+        { label: 'Итого на агенствах', data: totalAgencies, borderColor: '#10b981', tension: 0.3 }
       ]
     },
     options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'Графік 1: Заморожені гроші', color: '#f8fafc' } } }
@@ -300,7 +304,7 @@ function renderMainCharts(dates) {
       datasets: [
         { label: 'Маржа', data: margin, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.3 },
         { label: 'Спенд без Ecom', data: spendNoEcom, borderColor: '#ef4444', tension: 0.3 },
-        { label: 'Рекли Баланс', data: revAdvertisers, borderColor: '#10b981', tension: 0.3 }
+        { label: 'Рекли Ревеню', data: revRevenue, borderColor: '#10b981', tension: 0.3 }
       ]
     },
     options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'Графік 2: Маржа та Спенд', color: '#f8fafc' } } }
