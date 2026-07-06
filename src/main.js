@@ -78,7 +78,7 @@ function processData(result) {
   const rows2_rev = result.source2_revenue || [];
   const rows2_with = result.source2_withdrawal || [];
 
-  // Extract dates from source1 (Row 1 usually contains 'Контрольная дата')
+  // Extract MASTER dates from source1
   let dateRowIndex = 0;
   for (let i = 0; i < Math.min(5, rows1.length); i++) {
     if (rows1[i][0] && rows1[i][0].toString().includes('Контрольная дата')) {
@@ -90,44 +90,74 @@ function processData(result) {
 
   const dateRow = rows1[dateRowIndex] || [];
   const allDates = [];
-  const dateIndices = [];
 
   for (let i = 1; i < dateRow.length; i++) {
     const dateVal = dateRow[i];
     if (dateVal && dateVal.toString().trim() !== "") {
       allDates.push(formatDateLocal(dateVal)); 
-      dateIndices.push(i);
     }
   }
 
   appData.dates = allDates;
 
-  // Parse All Sources
-  appData.source1Metrics = parseRows(rows1, dateIndices);
-  appData.source2Metrics = parseRows(rows2, dateIndices);
-  appData.source2RevMetrics = parseRows(rows2_rev, dateIndices);
-  appData.source2WithMetrics = parseRows(rows2_with, dateIndices);
+  // Parse All Sources using the dynamic date mapper
+  appData.source1Metrics = parseSource(rows1, allDates);
+  appData.source2Metrics = parseSource(rows2, allDates);
+  appData.source2RevMetrics = parseSource(rows2_rev, allDates);
+  appData.source2WithMetrics = parseSource(rows2_with, allDates);
 
   calculateCustomMetrics();
 }
 
-function parseRows(rows, dateIndices) {
+// Robust parser that maps columns to global dates based on string matching
+function parseSource(rows, globalDates) {
   if (!rows || rows.length === 0) return [];
+  
+  // Find date row in this specific source
+  let dateRowIndex = -1;
+  let localDateIndices = {}; // map: globalDateStr -> colIndex
+
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const r = rows[i];
+    let matchedDates = 0;
+    let tempIndices = {};
+    for (let c = 1; c < r.length; c++) {
+      if (r[c]) {
+        const dStr = formatDateLocal(r[c]);
+        if (globalDates.includes(dStr)) {
+          matchedDates++;
+          tempIndices[dStr] = c;
+        }
+      }
+    }
+    if (matchedDates > 0) {
+      dateRowIndex = i;
+      localDateIndices = tempIndices;
+      break;
+    }
+  }
+
   const metrics = [];
-  for (let r = 1; r < rows.length; r++) {
+  for (let r = 0; r < rows.length; r++) {
+    if (r === dateRowIndex) continue; // Skip header
     const row = rows[r];
     const name = row[0] ? row[0].toString().trim() : "";
-    if (!name || name === "Контрольная дата") continue;
+    if (!name || name === "Контрольная дата" || name === "Контрольна дата") continue;
 
     const values = [];
-    for (let i = 0; i < dateIndices.length; i++) {
-      const c = dateIndices[i];
-      let val = row[c];
-      if (val === "" || val === null || val === undefined) {
-        values.push(null);
+    for (let i = 0; i < globalDates.length; i++) {
+      const gDate = globalDates[i];
+      const colIdx = localDateIndices[gDate];
+      if (colIdx !== undefined && colIdx < row.length) {
+        let val = row[colIdx];
+        if (val === "" || val === null || val === undefined) {
+          values.push(null);
+        } else {
+          val = val.toString().replace(/,/g, '.').replace(/\s/g, '');
+          values.push(parseFloat(val) || 0);
+        }
       } else {
-        val = val.toString().replace(/,/g, '.').replace(/\s/g, '');
-        values.push(parseFloat(val) || 0);
+        values.push(null); // No data for this date in this source
       }
     }
     metrics.push({ name, values });
@@ -165,7 +195,7 @@ function calculateCustomMetrics() {
 
   const revAdvertisers = getVals("Рекли Баланс");
   const spendNoEcom = getVals("Спенд без урахування Ecom");
-  const totalAgencies = getVals("Итого на агенствах"); // Changed from Баланс на акках агенства
+  const totalAgencies = getVals("Итого на агенствах");
 
   const margin = [];
   const frozen = [];
@@ -230,7 +260,7 @@ function renderMainCharts(dates) {
 
   const frozen = appData.customMetrics.find(m => m.name === "Заморожені гроші без товарки").values.slice(-dates.length);
   const balPartners = sliceVals("Рекли Баланс");
-  const totalAgencies = sliceVals("Итого на агенствах"); // New requirement
+  const totalAgencies = sliceVals("Итого на агенствах");
 
   const margin = appData.customMetrics.find(m => m.name === "Маржа без товарки итого").values.slice(-dates.length);
   const spendNoEcom = sliceVals("Спенд без урахування Ecom");
