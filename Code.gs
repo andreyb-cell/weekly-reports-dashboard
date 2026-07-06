@@ -6,11 +6,15 @@ function doGet(e) {
   try {
     var data1 = getSheetData(sheetId1, tabName);
     var data2 = getSheetData(sheetId2, tabName);
+    var data2_rev = getSheetData(sheetId2, "Рекли Ревеню");
+    var data2_with = getSheetData(sheetId2, "Рекли Вивід");
     
     var result = {
       status: "success",
       source1: data1,
-      source2: data2
+      source2: data2,
+      source2_revenue: data2_rev,
+      source2_withdrawal: data2_with
     };
     
     // Повертаємо дані як JSON
@@ -29,7 +33,7 @@ function getSheetData(sheetId, tabName) {
   var sheet = ss.getSheetByName(tabName);
   
   if (!sheet) {
-    throw new Error("Tab '" + tabName + "' not found in document " + sheetId);
+    return [];
   }
   
   // Беремо весь діапазон даних
