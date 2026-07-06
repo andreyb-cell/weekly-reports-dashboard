@@ -43,9 +43,22 @@ function parseSheetData(rows) {
   const allDates = [];
   const dateIndices = [];
 
+  // Знайдемо рядок, де містяться дати (там де перший елемент 'Контрольная дата' або просто візьмемо 2-й рядок, бо 1-й пустий)
+  let dateRowIndex = 0;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    if (rows[i][0] && rows[i][0].toString().includes('Контрольная дата')) {
+      dateRowIndex = i;
+      break;
+    }
+  }
+  // Якщо не знайшли по слову, візьмемо 1 індекс (2-й рядок)
+  if (dateRowIndex === 0 && rows.length > 1) dateRowIndex = 1;
+
+  const dateRow = rows[dateRowIndex];
+
   // Parse Dates
-  for (let i = 1; i < rows[0].length; i++) {
-    const dateVal = rows[0][i];
+  for (let i = 1; i < dateRow.length; i++) {
+    const dateVal = dateRow[i];
     if (dateVal && dateVal.toString().trim() !== "") {
       let dStr = dateVal.toString();
       if (dStr.includes('T')) dStr = dStr.split('T')[0];
