@@ -4,89 +4,137 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Weekly Reports Dashboard</title>
-    <!-- Google Fonts for Modern Typography -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="app" class="app-container">
-      <!-- Header -->
-      <header class="header">
-        <div class="header-title">
-          <h1>Weekly Dashboard</h1>
-          <p class="subtitle">Аналітика та звіти по агентствам</p>
+    <header class="dashboard-header">
+      <div class="header-left">
+        <h1>Weekly Dashboard</h1>
+        <p>Аналітика та звіти по агентствам</p>
+      </div>
+      <div class="header-right">
+        <button id="refresh-btn" class="btn btn-primary">Оновити дані</button>
+      </div>
+    </header>
+
+    <div class="tabs-container">
+      <button class="tab-btn active" data-tab="tab-main">Загальний Дашборд</button>
+      <button class="tab-btn" data-tab="tab-cost">Cost (Агенства)</button>
+      <button class="tab-btn" data-tab="tab-revenue">Revenue (Партнери)</button>
+    </div>
+
+    <!-- MAIN TAB -->
+    <div id="tab-main" class="tab-content active">
+      <section class="dashboard-section hidden" id="validation-block">
+        <h2>Перевірка даних</h2>
+        <div id="validation-messages"></div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2>Візуалізація трендів</h2>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <canvas id="chart1"></canvas>
+          </div>
+          <div class="chart-card">
+            <canvas id="chart2"></canvas>
+          </div>
         </div>
-        <div class="header-actions">
+      </section>
+
+      <section class="dashboard-section">
+        <h2>Зведена таблиця даних</h2>
+        <div class="table-responsive">
+          <table id="main-table">
+            <thead>
+              <tr id="main-table-header">
+                <th>МЕТРИКА</th>
+                <!-- Dates will be populated here -->
+              </tr>
+            </thead>
+            <tbody id="main-table-body">
+              <!-- Rows will be populated here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- COST TAB -->
+    <div id="tab-cost" class="tab-content">
+      <section class="dashboard-section filters-section">
+        <div class="filters-grid">
           <div class="filter-group">
-            <label for="date-range">Період:</label>
-            <select id="date-range">
-              <option value="last-4">Останні 4 тижні</option>
+            <label for="cost-period">Період:</label>
+            <select id="cost-period">
+              <option value="4w">Останні 4 тижні</option>
+              <option value="8w">Останні 8 тижнів</option>
               <option value="all">Весь час</option>
             </select>
           </div>
-          <button id="refresh-btn" class="btn btn-primary">Оновити дані</button>
-        </div>
-      </header>
-
-      <!-- Main Content -->
-      <main class="main-content">
-        <!-- Validation Alerts -->
-        <section id="validation-block" class="dashboard-section validation-section hidden">
-          <h2>Перевірка даних</h2>
-          <div id="validation-messages" class="alerts-container"></div>
-        </section>
-
-        <!-- Summary Table -->
-        <section class="dashboard-section">
-          <div class="section-header">
-            <h2>Зведена таблиця даних</h2>
-          </div>
-          <div class="table-responsive">
-            <table id="summary-table" class="data-table">
-              <thead>
-                <tr id="table-header-row">
-                  <!-- Dates will be populated here -->
-                  <th class="metric-col">Метрика</th>
-                </tr>
-              </thead>
-              <tbody id="table-body">
-                <!-- Rows will be populated here -->
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- Charts Section -->
-        <section class="dashboard-section">
-          <h2>Візуалізація трендів</h2>
-          <div class="charts-grid">
-            <div class="chart-card">
-              <canvas id="revenueChart"></canvas>
-            </div>
-            <div class="chart-card">
-              <canvas id="spendChart"></canvas>
-            </div>
-          </div>
-        </section>
-
-        <!-- Source / Partner Details -->
-        <section class="dashboard-section">
-          <div class="section-header">
-            <h2>Деталізація по Source / Партнерці</h2>
-            <select id="source-selector" class="selector">
-              <option value="all">Усі партнери</option>
-              <option value="partner1">Партнер 1</option>
-              <option value="partner2">Партнер 2</option>
+          <div class="filter-group">
+            <label for="cost-agency">Агенство:</label>
+            <select id="cost-agency">
+              <option value="all">Всі агенства</option>
+              <!-- Agencies will be populated here -->
             </select>
           </div>
-          <div class="details-content">
-            <div class="empty-state">Оберіть партнера для деталізації</div>
-          </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <div class="table-responsive">
+          <table id="cost-table">
+            <thead>
+              <tr id="cost-table-header">
+                <th>АГЕНСТВО</th>
+                <!-- Dates will be populated here -->
+              </tr>
+            </thead>
+            <tbody id="cost-table-body">
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
-    
+
+    <!-- REVENUE TAB -->
+    <div id="tab-revenue" class="tab-content">
+      <section class="dashboard-section filters-section">
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label for="rev-period">Період:</label>
+            <select id="rev-period">
+              <option value="4w">Останні 4 тижні</option>
+              <option value="8w">Останні 8 тижнів</option>
+              <option value="all">Весь час</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="rev-partner">Партнер:</label>
+            <select id="rev-partner">
+              <option value="all">Всі партнери</option>
+              <!-- Partners will be populated here -->
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <div class="table-responsive">
+          <table id="revenue-table">
+            <thead>
+              <tr id="revenue-table-header">
+                <th>ПАРТНЕР</th>
+                <!-- Dates will be populated here -->
+              </tr>
+            </thead>
+            <tbody id="revenue-table-body">
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
