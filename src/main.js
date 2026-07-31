@@ -8,7 +8,8 @@ let appData = {
   source2Metrics: [],
   source2RevMetrics: [],
   source2WithMetrics: [],
-  customMetrics: []
+  customMetrics: [],
+  validationWarnings: []
 };
 let charts = {};
 
@@ -38,6 +39,14 @@ const ALL_SUMMARY_NAMES = [
   "Рекли Баланс",
   "Рекли Ревеню",
   "Рекли Вивід"
+];
+
+const COST_BLOCKS = [
+  "Пополнения агенств",
+  "Итого на агенствах",
+  "У Агенств не распределенный ",
+  "Баланс на акках агенства",
+  "Спенд по агенствам"
 ];
 
 function formatNumber(num) {
@@ -78,6 +87,8 @@ function processData(result) {
   const rows2_rev = result.source2_revenue || [];
   const rows2_with = result.source2_withdrawal || [];
 
+  appData.validationWarnings = [];
+
   // Extract MASTER dates from source1
   let dateRowIndex = 0;
   for (let i = 0; i < Math.min(5, rows1.length); i++) {
@@ -101,16 +112,30 @@ function processData(result) {
   appData.dates = allDates;
 
   // Parse All Sources using the dynamic date mapper
-  appData.source1Metrics = parseSource(rows1, allDates);
-  appData.source2Metrics = parseSource(rows2, allDates);
-  appData.source2RevMetrics = parseSource(rows2_rev, allDates);
-  appData.source2WithMetrics = parseSource(rows2_with, allDates);
+  appData.source1Metrics = parseSource(rows1, allDates, 'Звіт тижневий: Кости і KPI', 'Загальний');
+  appData.source2Metrics = parseSource(rows2, allDates, 'Звіт тижневий: Баланси', 'Загальний');
+  appData.source2RevMetrics = parseSource(rows2_rev, allDates, 'Звіт тижневий: Баланси', 'Рекли Ревеню');
+  appData.source2WithMetrics = parseSource(rows2_with, allDates, 'Звіт тижневий: Баланси', 'Рекли Вивід');
 
   calculateCustomMetrics();
+
+  // Populate Date Filter for Main Tab
+  const mainDateSelect = document.getElementById('main-period-date');
+  mainDateSelect.innerHTML = '';
+  allDates.forEach((date, index) => {
+    const opt = document.createElement('option');
+    opt.value = index;
+    opt.textContent = date;
+    mainDateSelect.appendChild(opt);
+  });
+  // Select the latest date by default
+  if (allDates.length > 0) {
+    mainDateSelect.value = allDates.length - 1;
+  }
 }
 
 // Robust parser that maps columns to global dates based on string matching
-function parseSource(rows, globalDates) {
+function parseSource(rows, globalDates, tableName, tabName) {
   if (!rows || rows.length === 0) return [];
   
   // Find date row in this specific source
@@ -152,12 +177,25 @@ function parseSource(rows, globalDates) {
         let val = row[colIdx];
         if (val === "" || val === null || val === undefined) {
           values.push(null);
+          // Only warn if this metric is somehow used in our dashboard. 
+          // We assume any metric parsed might be used, but let's exclude completely blank rows
+          if (name !== "") {
+            appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": рядок "${name}" за дату "${gDate}" не заповнений!`);
+          }
         } else {
           val = val.toString().replace(/,/g, '.').replace(/\s/g, '');
-          values.push(parseFloat(val) || 0);
+          const parsed = parseFloat(val);
+          if (isNaN(parsed)) {
+            values.push(0);
+          } else {
+            values.push(parsed);
+          }
         }
       } else {
         values.push(null); // No data for this date in this source
+        if (name !== "") {
+          appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": рядок "${name}" за дату "${gDate}" не знайдено (відсутня колонка)!`);
+        }
       }
     }
     metrics.push({ name, values });
@@ -207,9 +245,7 @@ function calculateCustomMetrics() {
     const s = spendNoEcom[i] || 0;
     const t = totalAgencies[i] || 0;
 
-    // Маржа без товарки итого = Рекли Ревеню - Спенд без урахування Ecom
     margin.push(r_rev - s);
-    // Заморожені гроші без товарки = Рекли Баланс + Итого на агенствах
     frozen.push(r_bal + t);
   }
 
@@ -221,53 +257,52 @@ function calculateCustomMetrics() {
 
 // 4. Render Main Tab
 function renderMainTab() {
+  const mainDateSelect = document.getElementById('main-period-date');
+  let selectedIndex = parseInt(mainDateSelect.value);
+  if (isNaN(selectedIndex)) selectedIndex = appData.dates.length - 1;
+
   const numWeeks = 5;
-  const dates = appData.dates.slice(-numWeeks);
+  const startIndex = Math.max(0, selectedIndex - numWeeks + 1);
+  const dates = appData.dates.slice(startIndex, selectedIndex + 1);
   
   // Table
   const tableData = [];
   
-  // Add required metrics in explicit order
   MAIN_DASHBOARD_METRICS.forEach(name => {
     const m = getMetric(name);
     if (m) {
       tableData.push({
         name: m.name,
-        values: m.values.slice(-numWeeks),
+        values: m.values.slice(startIndex, selectedIndex + 1),
         highlight: m.name.toLowerCase().includes('итого') || m.name.toLowerCase().includes('баланс') || m.name.toLowerCase().includes('вивід') || m.name.toLowerCase().includes('ревеню')
       });
     }
   });
 
-  // Add Custom Metrics
   appData.customMetrics.forEach(m => {
     tableData.push({
       name: m.name,
-      values: m.values.slice(-numWeeks),
+      values: m.values.slice(startIndex, selectedIndex + 1),
       highlight: true
     });
   });
 
   renderTableHTML('main-table', dates, tableData);
-
-  // Charts
-  renderMainCharts(dates);
+  renderMainCharts(dates, startIndex, selectedIndex + 1);
 }
 
-function renderMainCharts(dates) {
+function renderMainCharts(dates, startIdx, endIdx) {
   const sliceVals = (name) => {
     const m = getMetric(name);
-    return m ? m.values.slice(-dates.length) : new Array(dates.length).fill(0);
+    return m ? m.values.slice(startIdx, endIdx) : new Array(dates.length).fill(0);
   };
 
-  const frozen = appData.customMetrics.find(m => m.name === "Заморожені гроші без товарки").values.slice(-dates.length);
+  const frozen = appData.customMetrics.find(m => m.name === "Заморожені гроші без товарки").values.slice(startIdx, endIdx);
   const balPartners = sliceVals("Рекли Баланс");
   const totalAgencies = sliceVals("Итого на агенствах");
 
-  const margin = appData.customMetrics.find(m => m.name === "Маржа без товарки итого").values.slice(-dates.length);
+  const margin = appData.customMetrics.find(m => m.name === "Маржа без товарки итого").values.slice(startIdx, endIdx);
   const spendNoEcom = sliceVals("Спенд без урахування Ecom");
-  const revAdvertisers = sliceVals("Рекли Баланс"); // This remains on the chart, or do they want 'Рекли Ревеню' on chart 2?
-  // Let's use 'Рекли Ревеню' on chart 2 since margin is calculated using it now
   const revRevenue = sliceVals("Рекли Ревеню");
 
   const commonOptions = {
@@ -317,32 +352,72 @@ function renderCostTab() {
   const numWeeks = periodVal === 'all' ? appData.dates.length : (periodVal === '8w' ? 8 : 4);
   const dates = appData.dates.slice(-numWeeks);
   
-  const agencyVal = document.getElementById('cost-agency').value;
+  const cbState = {
+    "Пополнения агенств": document.getElementById('cb-popolneniya').checked,
+    "Итого на агенствах": document.getElementById('cb-itogo').checked,
+    "У Агенств не распределенный ": document.getElementById('cb-unallocated').checked,
+    "Баланс на акках агенства": document.getElementById('cb-balance').checked,
+    "Спенд по агенствам": document.getElementById('cb-spend').checked
+  };
+
+  const tbody = document.getElementById('cost-table-body');
+  const theadRow = document.getElementById('cost-table-header');
   
-  // Exclude summary metrics, only show actual agencies
-  let dataToRender = appData.source1Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && !m.name.includes("Итого"));
-
-  if (agencyVal !== 'all') {
-    dataToRender = dataToRender.filter(m => m.name === agencyVal);
+  while (theadRow.children.length > 1) {
+    theadRow.removeChild(theadRow.lastChild);
   }
+  tbody.innerHTML = '';
 
-  const tableData = dataToRender.map(m => ({
-    name: m.name,
-    values: m.values.slice(-numWeeks)
-  }));
+  dates.forEach(date => {
+    const th = document.createElement('th');
+    th.textContent = date;
+    theadRow.appendChild(th);
+  });
 
-  renderTableHTML('cost-table', dates, tableData);
+  let currentBlock = null;
+  let blockRows = [];
 
-  // Populate filter dropdown if empty
-  const select = document.getElementById('cost-agency');
-  if (select.options.length <= 1) {
-    appData.source1Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && !m.name.includes("Итого")).forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.name;
-      opt.textContent = m.name;
-      select.appendChild(opt);
-    });
-  }
+  // Re-organize source1 metrics into blocks
+  appData.source1Metrics.forEach(m => {
+    if (COST_BLOCKS.includes(m.name)) {
+      currentBlock = m.name;
+    }
+    
+    if (currentBlock && cbState[currentBlock]) {
+      const isHeader = m.name === currentBlock;
+      
+      const tr = document.createElement('tr');
+      if (isHeader) {
+        tr.classList.add('block-header-row');
+        tr.style.cursor = 'pointer';
+        tr.onclick = () => {
+          const rows = tbody.querySelectorAll(`.block-child-${currentBlock.replace(/\s+/g, '-')}`);
+          rows.forEach(r => r.style.display = r.style.display === 'none' ? '' : 'none');
+        };
+      } else {
+        tr.classList.add(`block-child-${currentBlock.replace(/\s+/g, '-')}`);
+      }
+
+      const tdName = document.createElement('td');
+      tdName.classList.add('metric-col');
+      if (!isHeader) {
+        tdName.style.paddingLeft = '20px';
+      }
+      tdName.textContent = m.name;
+      tr.appendChild(tdName);
+
+      const sliceVals = m.values.slice(-numWeeks);
+      sliceVals.forEach(val => {
+        const td = document.createElement('td');
+        td.textContent = formatNumber(val);
+        if (val < 0) td.classList.add('val-negative');
+        if (isHeader) td.style.fontWeight = 'bold';
+        tr.appendChild(td);
+      });
+      
+      tbody.appendChild(tr);
+    }
+  });
 }
 
 // 6. Render Revenue Tab
@@ -352,20 +427,44 @@ function renderRevenueTab() {
   const dates = appData.dates.slice(-numWeeks);
   
   const partnerVal = document.getElementById('rev-partner').value;
+  const sortVal = document.getElementById('rev-sort').value;
   
-  // Exclude main summary metrics if any
   let dataToRender = appData.source2Metrics.filter(m => !ALL_SUMMARY_NAMES.includes(m.name) && m.name !== " ");
 
   if (partnerVal !== 'all') {
     dataToRender = dataToRender.filter(m => m.name === partnerVal);
   }
 
-  const tableData = dataToRender.map(m => ({
+  // Formatting values
+  const formattedData = dataToRender.map(m => ({
     name: m.name,
     values: m.values.slice(-numWeeks)
   }));
 
-  renderTableHTML('revenue-table', dates, tableData);
+  // Sorting
+  if (sortVal === 'revenue-desc' && formattedData.length > 0) {
+    formattedData.sort((a, b) => {
+      const aVal = a.values[a.values.length - 1] || 0;
+      const bVal = b.values[b.values.length - 1] || 0;
+      return bVal - aVal;
+    });
+  }
+
+  // Calculate Total Row
+  const totals = new Array(dates.length).fill(0);
+  formattedData.forEach(row => {
+    row.values.forEach((v, i) => {
+      totals[i] += (v || 0);
+    });
+  });
+
+  formattedData.push({
+    name: 'Итого',
+    values: totals,
+    highlight: true
+  });
+
+  renderTableHTML('revenue-table', dates, formattedData);
 
   // Populate filter dropdown if empty
   const select = document.getElementById('rev-partner');
@@ -379,11 +478,52 @@ function renderRevenueTab() {
   }
 }
 
+// 7. Render Validation Tab
+function renderValidationTab() {
+  // Warnings
+  const warningsList = document.getElementById('validation-messages-list');
+  warningsList.innerHTML = '';
+  if (appData.validationWarnings.length === 0) {
+    warningsList.innerHTML = '<p class="success-text">Всі необхідні дані заповнені!</p>';
+  } else {
+    // Only show unique warnings to avoid spam
+    const uniqueWarnings = [...new Set(appData.validationWarnings)];
+    uniqueWarnings.forEach(w => {
+      const p = document.createElement('p');
+      p.classList.add('warning-text');
+      p.textContent = '⚠️ ' + w;
+      warningsList.appendChild(p);
+    });
+  }
+
+  // Validation Table
+  const proverkaMetric = getMetric("Проверка");
+  const mainDateSelect = document.getElementById('main-period-date');
+  let selectedIndex = parseInt(mainDateSelect.value);
+  if (isNaN(selectedIndex)) selectedIndex = appData.dates.length - 1;
+  const numWeeks = 5;
+  const startIndex = Math.max(0, selectedIndex - numWeeks + 1);
+  const dates = appData.dates.slice(startIndex, selectedIndex + 1);
+
+  if (proverkaMetric) {
+    const tableData = [{
+      name: proverkaMetric.name,
+      values: proverkaMetric.values.slice(startIndex, selectedIndex + 1),
+      highlight: true
+    }];
+    renderTableHTML('validation-table', dates, tableData);
+  } else {
+    document.getElementById('validation-table-body').innerHTML = '<tr><td colspan="6">Рядок "Проверка" не знайдено</td></tr>';
+  }
+}
+
 // Utility to render HTML tables
 function renderTableHTML(tableId, dates, metrics) {
   const theadRow = document.getElementById(`${tableId}-header`);
   const tbody = document.getElementById(`${tableId}-body`);
   
+  if(!theadRow || !tbody) return;
+
   while (theadRow.children.length > 1) {
     theadRow.removeChild(theadRow.lastChild);
   }
@@ -398,6 +538,7 @@ function renderTableHTML(tableId, dates, metrics) {
   metrics.forEach(metric => {
     const tr = document.createElement('tr');
     if (metric.highlight) tr.classList.add('row-highlight');
+    if (metric.name === 'Итого') tr.classList.add('total-row');
 
     const tdName = document.createElement('td');
     tdName.classList.add('metric-col');
@@ -417,26 +558,31 @@ function renderTableHTML(tableId, dates, metrics) {
 // Setup Tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
-    // Remove active class from all tabs and contents
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     
-    // Add active class to clicked tab and its content
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
     
-    // Re-render based on active tab
     if (btn.dataset.tab === 'tab-main') renderMainTab();
     if (btn.dataset.tab === 'tab-cost') renderCostTab();
     if (btn.dataset.tab === 'tab-revenue') renderRevenueTab();
+    if (btn.dataset.tab === 'tab-validation') renderValidationTab();
   });
 });
 
 // Setup Filters
+document.getElementById('main-period-date').addEventListener('change', () => {
+  renderMainTab();
+  renderValidationTab();
+});
 document.getElementById('cost-period').addEventListener('change', renderCostTab);
-document.getElementById('cost-agency').addEventListener('change', renderCostTab);
+['cb-popolneniya', 'cb-itogo', 'cb-unallocated', 'cb-balance', 'cb-spend'].forEach(id => {
+  document.getElementById(id).addEventListener('change', renderCostTab);
+});
 document.getElementById('rev-period').addEventListener('change', renderRevenueTab);
 document.getElementById('rev-partner').addEventListener('change', renderRevenueTab);
+document.getElementById('rev-sort').addEventListener('change', renderRevenueTab);
 
 // Init
 document.getElementById('refresh-btn').addEventListener('click', async () => {
@@ -444,9 +590,13 @@ document.getElementById('refresh-btn').addEventListener('click', async () => {
   btn.textContent = 'Завантаження...';
   btn.disabled = true;
   await fetchData();
+  
+  // Render active tab only, or render all to prepare
   renderMainTab();
   renderCostTab();
   renderRevenueTab();
+  renderValidationTab();
+  
   btn.textContent = 'Оновити дані';
   btn.disabled = false;
 });
