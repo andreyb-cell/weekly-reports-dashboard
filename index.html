@@ -20,13 +20,20 @@
       <button class="tab-btn active" data-tab="tab-main">Загальний Дашборд</button>
       <button class="tab-btn" data-tab="tab-cost">Cost (Агенства)</button>
       <button class="tab-btn" data-tab="tab-revenue">Revenue (Партнери)</button>
+      <button class="tab-btn" data-tab="tab-validation">Перевірка</button>
     </div>
 
     <!-- MAIN TAB -->
     <div id="tab-main" class="tab-content active">
-      <section class="dashboard-section hidden" id="validation-block">
-        <h2>Перевірка даних</h2>
-        <div id="validation-messages"></div>
+      <section class="dashboard-section filters-section">
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label for="main-period-date">Виберіть кінцеву дату (покаже 5 тижнів):</label>
+            <select id="main-period-date">
+              <!-- Dates will be populated here -->
+            </select>
+          </div>
+        </div>
       </section>
 
       <section class="dashboard-section">
@@ -72,11 +79,14 @@
             </select>
           </div>
           <div class="filter-group">
-            <label for="cost-agency">Агенство:</label>
-            <select id="cost-agency">
-              <option value="all">Всі агенства</option>
-              <!-- Agencies will be populated here -->
-            </select>
+            <label>Відображати блоки:</label>
+            <div class="checkbox-group">
+              <label><input type="checkbox" id="cb-popolneniya" checked> Пополнения агенств</label>
+              <label><input type="checkbox" id="cb-itogo" checked> Итого на агенствах</label>
+              <label><input type="checkbox" id="cb-unallocated" checked> У Агенств не распределенный</label>
+              <label><input type="checkbox" id="cb-balance" checked> Баланс на акках агенства</label>
+              <label><input type="checkbox" id="cb-spend" checked> Спенд по агенствам</label>
+            </div>
           </div>
         </div>
       </section>
@@ -116,6 +126,13 @@
               <!-- Partners will be populated here -->
             </select>
           </div>
+          <div class="filter-group">
+            <label for="rev-sort">Сортування:</label>
+            <select id="rev-sort">
+              <option value="default">За замовчуванням</option>
+              <option value="revenue-desc">За ревеню (останній тиждень) ▼</option>
+            </select>
+          </div>
         </div>
       </section>
 
@@ -129,6 +146,33 @@
               </tr>
             </thead>
             <tbody id="revenue-table-body">
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- VALIDATION TAB -->
+    <div id="tab-validation" class="tab-content">
+      <section class="dashboard-section validation-warnings">
+        <h2>Попередження щодо незаповнених даних</h2>
+        <div id="validation-messages-list" class="warnings-list">
+          <!-- Warnings will be populated here -->
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2>Перевірка блоку "Проверка"</h2>
+        <div class="table-responsive">
+          <table id="validation-table">
+            <thead>
+              <tr id="validation-table-header">
+                <th>МЕТРИКА</th>
+                <!-- Dates will be populated here -->
+              </tr>
+            </thead>
+            <tbody id="validation-table-body">
+              <!-- Verification rows will be populated here -->
             </tbody>
           </table>
         </div>
