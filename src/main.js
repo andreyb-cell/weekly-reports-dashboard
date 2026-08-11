@@ -179,7 +179,8 @@ function parseSource(rows, globalDates, tableName, tabName) {
           values.push(null);
           // Only warn if this metric is somehow used in our dashboard. 
           // We assume any metric parsed might be used, but let's exclude completely blank rows
-          if (name !== "") {
+          // Only show warnings for the last 2 weeks
+          if (name !== "" && i >= globalDates.length - 2) {
             appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": рядок "${name}" за дату "${gDate}" не заповнений!`);
           }
         } else {
@@ -193,7 +194,7 @@ function parseSource(rows, globalDates, tableName, tabName) {
         }
       } else {
         values.push(null); // No data for this date in this source
-        if (name !== "") {
+        if (name !== "" && i >= globalDates.length - 2) {
           appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": рядок "${name}" за дату "${gDate}" не знайдено (відсутня колонка)!`);
         }
       }
