@@ -134,6 +134,15 @@ function processData(result) {
   }
 }
 
+function getColumnLetter(colIndex) {
+  let letter = '';
+  while (colIndex >= 0) {
+    letter = String.fromCharCode((colIndex % 26) + 65) + letter;
+    colIndex = Math.floor(colIndex / 26) - 1;
+  }
+  return letter;
+}
+
 // Robust parser that maps columns to global dates based on string matching
 function parseSource(rows, globalDates, tableName, tabName) {
   if (!rows || rows.length === 0) return [];
@@ -179,9 +188,11 @@ function parseSource(rows, globalDates, tableName, tabName) {
           values.push(null);
           // Only warn if this metric is somehow used in our dashboard. 
           // We assume any metric parsed might be used, but let's exclude completely blank rows
-          // Only show warnings for the last 2 weeks
-          if (name !== "" && i >= globalDates.length - 2) {
-            appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": рядок "${name}" за дату "${gDate}" не заповнений!`);
+          // Only show warnings for the last 2 weeks and only for "Загальний" tab
+          if (name !== "" && i >= globalDates.length - 2 && tabName === 'Загальний') {
+            const rowNum = r + 1;
+            const colLetter = getColumnLetter(colIdx);
+            appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": Комірка ${colLetter}${rowNum} (рядок "${name}", дата "${gDate}") не заповнена!`);
           }
         } else {
           val = val.toString().replace(/,/g, '.').replace(/\s/g, '');
@@ -194,7 +205,7 @@ function parseSource(rows, globalDates, tableName, tabName) {
         }
       } else {
         values.push(null); // No data for this date in this source
-        if (name !== "" && i >= globalDates.length - 2) {
+        if (name !== "" && i >= globalDates.length - 2 && tabName === 'Загальний') {
           appData.validationWarnings.push(`Таблиця "${tableName}", вкладка "${tabName}": рядок "${name}" за дату "${gDate}" не знайдено (відсутня колонка)!`);
         }
       }
